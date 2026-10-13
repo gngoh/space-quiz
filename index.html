@@ -520,6 +520,72 @@
       letter-spacing: 0.05em;
     }
 
+    .flight-log {
+      margin: 0 0 1.5rem;
+      text-align: left;
+    }
+
+    .flight-log-toggle {
+      width: 100%;
+      justify-content: center;
+      background: var(--btn-bg);
+      color: var(--text);
+      border: 1px solid var(--btn-border);
+    }
+
+    .flight-log-toggle:hover {
+      background: var(--btn-hover);
+    }
+
+    .flight-log-toggle:focus-visible {
+      outline: 3px solid var(--primary);
+      outline-offset: 3px;
+    }
+
+    .flight-log-list {
+      display: grid;
+      gap: 0.75rem;
+      margin-top: 1rem;
+      list-style: none;
+    }
+
+    .flight-log-entry {
+      background: var(--btn-bg);
+      border: 1px solid var(--btn-border);
+      border-radius: 10px;
+      padding: 0.9rem;
+    }
+
+    .flight-log-entry h3 {
+      font-size: 0.9rem;
+      line-height: 1.4;
+      margin-bottom: 0.6rem;
+    }
+
+    .flight-log-status {
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+    }
+
+    .flight-log-entry.correct .flight-log-status {
+      color: var(--success);
+    }
+
+    .flight-log-entry.incorrect .flight-log-status {
+      color: var(--error);
+    }
+
+    .flight-log-answer,
+    .flight-log-explanation {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      overflow-wrap: anywhere;
+    }
+
+    .flight-log-explanation {
+      margin-top: 0.5rem;
+    }
+
     .restart-btn {
       width: 100%;
       justify-content: center;
@@ -588,6 +654,15 @@
           <div class="stat-card wrong">
             <div class="stat-card-val" id="stat-wrong">0</div>
             <div class="stat-card-lbl">Incorrect</div>
+          </div>
+        </div>
+
+        <div class="flight-log">
+          <button class="primary-btn flight-log-toggle" id="flight-log-toggle" type="button"
+            aria-expanded="false" aria-controls="flight-log-panel">View Detailed Flight Log</button>
+          <div id="flight-log-panel" role="region" aria-labelledby="flight-log-heading" hidden>
+            <h3 class="question-tag" id="flight-log-heading">MISSION FLIGHT LOG</h3>
+            <ol class="flight-log-list" id="flight-log-list"></ol>
           </div>
         </div>
 
@@ -663,6 +738,7 @@
     let currentQuestionIndex = 0;
     let score = 0;
     let answered = false;
+    let selectedAnswers = [];
 
     // DOM Elements
     const questionView = document.getElementById('question-view');
@@ -688,6 +764,9 @@
     const finalPercent = document.getElementById('final-percent');
     const statCorrect = document.getElementById('stat-correct');
     const statWrong = document.getElementById('stat-wrong');
+    const flightLogToggle = document.getElementById('flight-log-toggle');
+    const flightLogPanel = document.getElementById('flight-log-panel');
+    const flightLogList = document.getElementById('flight-log-list');
 
     const keyLabels = ['A', 'B', 'C', 'D'];
 
@@ -695,6 +774,11 @@
       currentQuestionIndex = 0;
       score = 0;
       answered = false;
+      selectedAnswers = questions.map(() => null);
+      flightLogList.innerHTML = '';
+      flightLogPanel.hidden = true;
+      flightLogToggle.setAttribute('aria-expanded', 'false');
+      flightLogToggle.textContent = 'View Detailed Flight Log';
       questionView.style.display = 'block';
       resultsView.style.display = 'none';
       renderQuestion();
@@ -791,7 +875,10 @@
           nextBtn.click();
         }
       } else if (resultsView.style.display !== 'none') {
-        if (e.key === 'Enter' || e.key.toLowerCase() === 'r') {
+        if (e.key.toLowerCase() === 'r') {
+          e.preventDefault();
+          restartBtn.click();
+        } else if (e.key === 'Enter' && !(document.activeElement instanceof HTMLButtonElement)) {
           e.preventDefault();
           restartBtn.click();
         }
@@ -804,6 +891,7 @@
 
       const q = questions[currentQuestionIndex];
       const isCorrect = selectedIndex === q.answer;
+      selectedAnswers[currentQuestionIndex] = selectedIndex;
       const buttons = optionsContainer.querySelectorAll('.option-btn');
 
       buttons.forEach((btn, idx) => {
@@ -862,6 +950,7 @@
     function showResults() {
       questionView.style.display = 'none';
       resultsView.style.display = 'block';
+      renderFlightLog();
 
       const pct = Math.round((score / questions.length) * 100);
       finalScore.textContent = `${score} / ${questions.length}`;
@@ -888,6 +977,50 @@
       }
       restartBtn.focus();
     }
+
+    function renderFlightLog() {
+      flightLogList.innerHTML = '';
+
+      questions.forEach((q, index) => {
+        const selectedIndex = selectedAnswers[index];
+        const isCorrect = selectedIndex === q.answer;
+        const entry = document.createElement('li');
+        entry.className = `flight-log-entry ${isCorrect ? 'correct' : 'incorrect'}`;
+
+        const title = document.createElement('h3');
+        title.textContent = `MISSION #${index + 1}: ${q.question}`;
+
+        const status = document.createElement('p');
+        status.className = 'flight-log-status';
+        status.textContent = isCorrect ? '✓ Correct' : '✕ Incorrect';
+
+        const selectedAnswer = document.createElement('p');
+        selectedAnswer.className = 'flight-log-answer';
+        selectedAnswer.textContent = `Your selection: ${keyLabels[selectedIndex]} — ${q.options[selectedIndex]}`;
+
+        entry.append(title, status, selectedAnswer);
+
+        if (!isCorrect) {
+          const correctAnswer = document.createElement('p');
+          correctAnswer.className = 'flight-log-answer';
+          correctAnswer.textContent = `Correct choice: ${keyLabels[q.answer]} — ${q.options[q.answer]}`;
+          entry.appendChild(correctAnswer);
+        }
+
+        const explanation = document.createElement('p');
+        explanation.className = 'flight-log-explanation';
+        explanation.textContent = q.explanation;
+        entry.appendChild(explanation);
+        flightLogList.appendChild(entry);
+      });
+    }
+
+    flightLogToggle.addEventListener('click', () => {
+      const isExpanded = flightLogToggle.getAttribute('aria-expanded') === 'true';
+      flightLogPanel.hidden = isExpanded;
+      flightLogToggle.setAttribute('aria-expanded', String(!isExpanded));
+      flightLogToggle.textContent = isExpanded ? 'View Detailed Flight Log' : 'Hide Detailed Flight Log';
+    });
 
     restartBtn.addEventListener('click', () => {
       initQuiz();
